@@ -6,11 +6,11 @@ rm(list=ls())
 require(labelled)
 options(digits = 5)
 
-source('code.DM/DM.FXN Slope models DM.R')
+source('code.DM/DM.FXN.3.add.clinical.data.R')
 
 pars. <- c('mFARS','FARS.E','FARS.B')
 
-fxn.dt. <- fxn.dt %>% 
+fxn.dt. <- fxn.dt. %>% 
   filter( map_int(data, nrow) > 1 )
 
 dt.bl <- fxn.dt. %>% 
@@ -67,7 +67,9 @@ dt.bl %<>%
 
 .tab1.sub <- function (df, strata = NA )  {
   tb <- tableone::CreateTableOne(
-    vars       = c('sex','aoo', 'gaa1', 'gaa2', 'pm', 'bl_age', 'fu_v' , 'fu_p', 'amb','analysis.group', 'mFARS', 'FARS.E','FARS.B'),
+    vars       = c('sex','aoo', 'gaa1', 'gaa2', 'pm', 'bl_age', 'fu_v' , 'fu_p', 
+                   # 'amb','analysis.group', 
+                   'mFARS', 'FARS.E','FARS.B'),
     factorVars = c('sex','amb', 'pm','analysis.group' ),
     strata     = strata,
     test = F,
@@ -94,28 +96,39 @@ dt.bl %<>%
 #   mutate(enrol.med = median(rfstdt)) %>% 
 #   mutate(study.3 = ifelse(study == 'FACOMS', ifelse(rfstdt < enrol.med, 'FACOMS.e','FACOMS.l'), 'FACHILD'))
 
-.tab1.sub( dt.bl, strata = c('analysis.group', 'amb') )
-.tab1.sub( dt.bl %>% filter(group == 'ok'), strata = c('study.3') )
-.tab1.sub( 
+ft <- .tab1.sub( 
   dt.bl %>% 
-    filter(group == 'ok'), strata = c('study') )
-.tab1.sub( 
+    filter(pm==0) %>% 
+    mutate(pm = ifelse(pm == 0, 0, 1)), 
+  strata = c('analysis.group', 'amb') 
+  )
+
+ft <- .tab1.sub( 
   dt.bl %>% 
-    filter(group == 'ok'), strata = 'group' )
+    filter(pm==0) %>% 
+    filter(
+      analysis.group != 'dipstick fxn.m',
+      amb == 'ambulatory'
+    ) %>% 
+    mutate(pm = ifelse(pm == 0, 0, 1)), 
+  strata = c('sev.o') 
+)
 
 
 
-read_pptx( '../Templates/CR.template.pptx' ) %>%
+read_pptx( '../../_templates/CR.template.pptx' ) %>%
   add_slide   ( layout = 'TTE', master = 'CR') %>%
-  ph_with     ( .tab1.all(dt.bl                    ), location = ph_location_type( type = "body" , id = 1) ) %>%
-  add_slide   ( layout = 'TTE', master = 'CR') %>%
-  ph_with     ( .tab1.sub(dt.bl, strata = 'study'), location = ph_location_type( type = "body" , id = 1) ) %>%
-  add_slide   ( layout = 'TTE', master = 'CR') %>%
-  ph_with     ( .tab1.sub(dt.bl, strata = c('study','amb')), location = ph_location_type( type = "body" , id = 1) ) %>%
-  add_slide   ( layout = 'TTE', master = 'CR') %>%
-  ph_with     ( .tab1.sub(dt.bl, strata = c('study','med.age')), location = ph_location_type( type = "body" , id = 1) ) %>%
-  add_slide   ( layout = 'TTE', master = 'CR') %>%
-  ph_with     ( .tab1.sub(dt.bl, strata = c('study','med.FrE')), location = ph_location_type( type = "body" , id = 1) ) %>%
+  ph_with     ( 
+    ft, 
+    location = ph_location_type( type = "body" , id = 1) ) %>%
+  # add_slide   ( layout = 'TTE', master = 'CR') %>%
+  # ph_with     ( .tab1.sub(dt.bl, strata = 'study'), location = ph_location_type( type = "body" , id = 1) ) %>%
+  # add_slide   ( layout = 'TTE', master = 'CR') %>%
+  # ph_with     ( .tab1.sub(dt.bl, strata = c('study','amb')), location = ph_location_type( type = "body" , id = 1) ) %>%
+  # add_slide   ( layout = 'TTE', master = 'CR') %>%
+  # ph_with     ( .tab1.sub(dt.bl, strata = c('study','med.age')), location = ph_location_type( type = "body" , id = 1) ) %>%
+  # add_slide   ( layout = 'TTE', master = 'CR') %>%
+  # ph_with     ( .tab1.sub(dt.bl, strata = c('study','med.FrE')), location = ph_location_type( type = "body" , id = 1) ) %>%
   print ( target = paste('Demo.Tables.', gsub(":","-", Sys.time()), ".pptx", sep="") )
 
 
