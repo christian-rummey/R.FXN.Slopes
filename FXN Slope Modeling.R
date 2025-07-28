@@ -22,6 +22,12 @@ fxn.dt %<>%
   mutate(across( c(value), ~ log10(.x)) ) %>%
   mutate(across( c(gaa1, gaa2), ~ .x / 100))
 
+fxn.dt. %<>% 
+  filter  ( !(paramcd == 'FARS.E' & phase == 2) ) %>% 
+  filter  ( !(paramcd == 'FARS.B' ) ) %>% 
+  filter( paramcd != 'FARS.B' )
+
+
 fxn.dt %>% 
   group_by( analysis.group )
 
@@ -32,8 +38,6 @@ table(fxn.dt$analysis.group)
 fxn.mod <- fxn.dt %>% 
   unnest  ( data ) %>% 
   # filter  (!dupline) %>% 
-  filter  ( !(paramcd == 'FARS.E' & phase == 2) ) %>% 
-  filter  ( !(paramcd == 'FARS.B' ) ) %>% 
   arrange ( phase, paramcd, analysis.group ) %>% 
   # filter(paramcd == 'FARS.E', phase == 1) %>% 
   # filter(analysis.group == 'dipstick fxn.m') %>% 
