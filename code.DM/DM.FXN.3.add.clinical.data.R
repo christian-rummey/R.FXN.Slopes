@@ -5,20 +5,32 @@ rm(list = ls())
 
 source('code.DM/DM.FXN.2.post.process.R')
 
+# for authorship ----------------------------------------------------------
+
+# fxn. %>% 
+#   filter(type == 'fxn.m') %>% 
+#   select(sjid, site, assay) %>% 
+#   filter(site != 'UCL') %>% 
+#   filter(!is.na(site)) %>%
+#   unique %>% .ug %>% 
+#   # filter(site == 'MCRI')
+#   select(site, assay) %>% .tab 
+# 
+# . -----------------------------------------------------------------------
+
 fxn. %<>% 
   # filter(study %in% c())
   filter  (
     status         == 'patient'
     )
 
-dt. <- readRDS ( '../R.RCR.Modeling/DATA derived/fars.forslope.rds' ) %>% 
-  filter(!dupline) %>% 
-  filter(study == 'UNIFAI') %>% 
-  mutate(amb = factor(phase.n, levels = c(1,2), labels = c('ambulatory','non-amb.')))
+# dt.1 <- readRDS ( '../R.RCR.Modeling/DATA derived/fars.forslope.rds' ) 
+dt. <- .dd('fars.slope') %>% 
+  filter(!is.na(phase))
 
-# 56 pts have no fars data (most are dipstick)
-fxn. %<>% 
-  # group_by(sjid) %>% 
+# ~65 pts have no fars data (most are dipstick)
+fxn. %<>%
+  group_by(sjid) %>%
   filter( sjid %in% unique(dt.$sjid) )
 
 # summarise FU data -------------------------------------------------------
@@ -55,7 +67,6 @@ bind_rows(
 
 rm(dt.ind)
 
-
 # study  ------------------------------------------------------------------
 
 fxn. %<>% 
@@ -81,12 +92,8 @@ fxn.dt. <- dt. %>%
     relationship = "many-to-many"
     )
 
-fxn.dt. %<>% 
+fxn.dt. %>% 
   filter(!is.na(pm))
-
-# %>% 
-#   filter(is.na(gaa1)) %>% 
-#   .p
 
 
 

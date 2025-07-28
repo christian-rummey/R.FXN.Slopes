@@ -1,4 +1,23 @@
 
+# # LoA does not correlate well - independent of how to scale things --------
+# 
+# tte.i.g %>%
+#   mutate(fxn = log10(fxn)) %>%
+#   filter(t1!=0 & is.finite(t2)) %>% 
+#   # pull(sjid) %>% unique -> sjids
+#   mutate(LoA = rowMeans(.[c('t1', 't2')])) %>% 
+#   filter(is.finite(LoA)) %>% 
+#   filter(!is.na(age)) %>%
+#   # mutate(age = age -aoo) %>%
+#   ggplot()+geom_point()+
+#   # aes(y = fxn, x = age)+
+#   # aes(y = fxn, x = log(age))+
+#   aes(y = log10(fxn), x = age)+
+#   facet_wrap( ~ analysis.group)+
+#   # stat_cor (aes(label = paste(..r.label..), y = 1.5), r.digits = 2)+
+#   stat_cor (aes(label = paste(..rr.label..) ), r.digits = 2)
+# 
+
 # . -----------------------------------------------------------------------
 
 dt. <- readRDS ( '../R.RCR.Modeling/DATA derived/fars.forslope.rds' ) %>% 
