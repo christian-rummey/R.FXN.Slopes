@@ -25,8 +25,15 @@ fxn. %<>%
     )
 
 # dt.1 <- readRDS ( '../R.RCR.Modeling/DATA derived/fars.forslope.rds' ) 
+
 dt. <- .dd('fars.slope') %>% 
   filter(!is.na(phase))
+
+# # ~65 pts have no fars data (most are dipstick)
+# fxn. %>%
+#   group_by(sjid) %>%
+#   filter( !sjid %in% unique(dt.$sjid) ) %>% 
+#   group_by( analysis.group ) %>% tally
 
 # ~65 pts have no fars data (most are dipstick)
 fxn. %<>%
@@ -81,7 +88,9 @@ fxn. %>%
 
 dt. %<>% 
   filter(sjid %in% unique(fxn.$sjid)) %>% 
-  group_by( study, sjid, paramcd, amb ) %>% 
+  group_by( study, sjid, paramcd, phase ) %>% # see readme for phase/amb description
+  mutate  ( time. = age - min( age ) ) %>% 
+  select  ( study, sjid, avisitn, avisit, bl.age, phase, time., paramcd, bl, aval, dupline ) %>% 
   nest()
 
 # 1899+1152+1152

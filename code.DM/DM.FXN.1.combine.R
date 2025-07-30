@@ -139,7 +139,7 @@ fxn. %<>%
   mutate( study  = factor( study  , c('UNIFAI','FACHILD','TRACKFA','FACOMS','external','external (Ian)') )) %>% 
   mutate( tissue = factor( tissue , c('blood','buccal') )) %>% 
   mutate( status = factor( status , c('patient','carrier','control','unknown') )) %>% 
-  mutate( type   = factor( type   , c('fxn.e','fxn.m','fxn.t') ))
+  mutate( type   = factor( type   , c('fxn.e','fxn.m','fxn.t'), labels = c('FXN-E', 'FXN-M', 'FXN-T') ))
 
 
 

@@ -24,15 +24,25 @@ Modelling the impact of Frataxin Levels on Disease Progression in FA
 
     -   calls DM.FXN.2.post.process.R
     -   adds slope datasets, using .dd('fars.slope') ( datasets and procedures defined in R.DM )
+    -   fars.slope
+        -   amb is actual assessment (not taken forward)
+        -   phase is monotonized and has dupline == TRUE at last amb visit (for first non-amb. visit)
+        -   bl scores and time are relative to phase
+
+# code pre-analysis plots
+
+-   FXN.Severity.Groups.Controls.Box.Density.Plots.R
+
+    -   Supplementary Figure 1
+
+    -   Density plots clarify need to use log scales
 
 # code.Describe Demo Table Programs
 
 # code.Describe Dataset pre-Analyses work
 
-# code.Describe LoA / DM TTE 
+# code.Describe LoA / DM TTE
 
 # FXN Slope Modelling
 
--   FXN Slope Modelling
-
-    -   
+## 
