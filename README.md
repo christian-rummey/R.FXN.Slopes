@@ -29,7 +29,7 @@ Modelling the impact of Frataxin Levels on Disease Progression in FA
         -   phase is monotonized and has dupline == TRUE at last amb visit (for first non-amb. visit)
         -   bl scores and time are relative to phase
 
-# code pre-analysis plots
+# code.pre-analysis
 
 -   FXN.Severity.Groups.Controls.Box.Density.Plots.R
 
@@ -37,7 +37,7 @@ Modelling the impact of Frataxin Levels on Disease Progression in FA
 
     -   Density plots clarify need to use log scales
 
-# code.Describe Demo Table Programs
+# code.Demo Table
 
 # code.Describe Dataset pre-Analyses work
 
