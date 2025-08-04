@@ -22,7 +22,7 @@ fxn. %<>%
   # filter(study %in% c())
   filter  (
     status         == 'patient'
-    )
+  )
 
 # dt.1 <- readRDS ( '../R.RCR.Modeling/DATA derived/fars.forslope.rds' ) 
 
@@ -63,7 +63,7 @@ bind_rows(
     filter( visits > 1 ) %>% 
     filter( sjid %in% c(fxn.$sjid) ) %>% 
     mutate( group = 'more than 1 visit, fxn.' )
-  ) %>% 
+) %>% 
   group_by(group) %>% 
   summarise( 
     subjects  = length(unique(sjid)),
@@ -99,11 +99,16 @@ fxn.dt. <- dt. %>%
   right_join(
     fxn.,
     relationship = "many-to-many"
-    )
+  )
 
 fxn.dt. %>% 
   filter(!is.na(pm))
 
-
+dt. %>% 
+  write_rds('DATA derived/dt.rds')
+fxn. %>% 
+  write_rds('DATA derived/fxn.rds')
+fxn.dt. %>% 
+  write_rds('DATA derived/fxn.dt.rds')
 
 

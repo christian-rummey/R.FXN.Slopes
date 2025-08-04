@@ -9,7 +9,7 @@ fxn. %<>%
   droplevels()
 
 fxn. %<>% 
-  mutate( assay = ifelse( unit == '%', 'LF Cohort [%]','LCMS Cohort [ng/ml]' ) )
+  mutate( assay = ifelse( unit == '%', 'LF Cohort [%]','TQ Cohort [ng/ml]' ) )
 
 # average multiple measures 
 
