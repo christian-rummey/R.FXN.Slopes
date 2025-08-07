@@ -2,7 +2,7 @@
 # intro -------------------------------------------------------------------
 
 rm(list = ls())
-source('project.settings.R')
+source('.project.settings.R')
 
 require(lme4)
 require(lmerTest)
@@ -11,7 +11,11 @@ require(broom.mixed)
 
 .lme4.ctrl      <- lmerControl( optimizer = "optimx", calc.derivs = FALSE, optCtrl = list(method = "nlminb" , starttests = FALSE, kkt = FALSE, maxiter = 10000, save.failures = T)) # def iterations 500
 
-source('code.DM/DM.FXN.3.add.clinical.data.R')
+# data prep ---------------------------------------------------------------
+
+fxn.dt. <- read_rds(here('DATA derived/fxn.dt.rds'))
+
+# filter missing and add variables
 
 fxn.dt. <- fxn.dt. %>%
   group_by(sjid) %>%           # 593 
@@ -19,23 +23,24 @@ fxn.dt. <- fxn.dt. %>%
   filter( !is.na(aoo) ) %>%    
   filter( !is.na(gaa1) ) %>%   # 539
   filter( !is.na(gaa2) ) %>%   # 538
-  mutate( identical = ifelse ( gaa1 == gaa2, '1', '0' ) )
-
-fxn.dt. %<>% 
+  
   mutate( log.value = log10(value) ) %>% 
-  # mutate(across( c(value), ~ log10(.x)) ) %>%
-  mutate(across( c(gaa1, gaa2), ~ .x / 100))
+  mutate(across( c(gaa1, gaa2), ~ .x / 100)) %>% 
+
+  mutate( identical = ifelse ( gaa1 == gaa2, '1', '0' ) ) %>% 
+  mutate( gaa700 = ifelse(gaa1 >= 700, 'high','low') ) %>% 
+  mutate( gaa500 = ifelse(gaa1 >  500, 'high','low') )
+
+# non-relevant phases
 
 fxn.dt. %<>% 
+  filter  ( !(type == 'FXN-T') ) %>% 
   filter  ( !(paramcd == 'FARS.E' & phase == 2) ) %>% 
   filter  ( !(paramcd == 'FARS.B' ) )
 
-fxn.dt. %>% 
-  group_by( analysis.group )
+with(fxn.dt., table(analysis.group, phase))
 
-table(fxn.dt.$analysis.group)
-
-# exclude low/high baselins ("Decline phase") -----------------------------
+# focus on decline phase  ---------------------------------------------------
 
 names. <- setdiff(names(fxn.dt.), "data")
 
@@ -50,83 +55,190 @@ fxn.dt. %<>%
   ) %>%
   nest(data = -all_of(names.))
 
-# finalize nested functional data --------------------------------------------
+# center and standardize variables ------------------------------------------
 
+fxn.dt. %<>% 
+  group_by(analysis.group, paramcd, phase) %>% 
+  mutate(
+    aoo.       = aoo       - mean(aoo),
+    gaa1.      = gaa1      - mean(gaa1),
+    fxn.       = log.value - mean(log.value)
+  ) %>% 
+  mutate(
+    gaa1.s = ( gaa1      - mean( gaa1     , na.rm = TRUE)) / sd( gaa1     , na.rm = TRUE),
+    aoo.s  = ( aoo       - mean( aoo      , na.rm = TRUE)) / sd( aoo      , na.rm = TRUE),
+    fxn.s  = ( log.value - mean( log.value, na.rm = TRUE)) / sd( log.value, na.rm = TRUE)
+  )
+
+# finalize nested functional data --------------------------------------------
 
 fxn.dt. %<>% 
   unnest  ( data ) %>% 
-  # filter  (!dupline) %>% 
-  arrange ( phase, paramcd, analysis.group ) %>% 
-  # filter(paramcd == 'FARS.E', phase == 1) %>%
-  # filter(analysis.group == 'dipstick fxn.m') %>% 
-  group_by( sjid, phase ) %>% 
-  mutate  ( time. = age - min(age) ) %>% 
-  mutate  ( sev.o = cut( aoo, c( 0, 7, 14, 24, 75, 100), include.lowest = T, labels = c('0-7y', '8-14y', '15-24y', '>24y','control'))) %>%
-  select  ( analysis.group, log.value, value, study, sjid, bl.age, sev.o, aoo, gaa1, gaa2, phase, avisitn, time., paramcd, bl, aval  ) %>% 
   
-  group_by( analysis.group, paramcd, phase ) %>% 
-  # arrange (phase) %>% 
+  # temporary filter data 
+  # filter(paramcd == 'FARS.E', phase == 1) %>%
+  
+  # filter  (!dupline) %>% 
+  
+  arrange ( phase, paramcd, analysis.group ) %>%
+  
+  group_by( sjid, phase ) %>% 
+  
+  mutate  ( sev.o = cut( aoo, c( 0, 7, 14, 24, 75, 100), include.lowest = T, labels = c('0-7y', '8-14y', '15-24y', '>24y','control'))) %>%
+
+  select  (
+    analysis.group, study, sjid, bl.age,
+    sev.o,
+    aoo. ,  aoo.s,
+    gaa1., gaa1.s,
+    fxn. ,  fxn.s, 
+    phase, avisitn, time., paramcd, bl, aval
+    ) %>% 
+  
+  group_by( analysis.group, paramcd, phase ) %>%
+  
   nest() 
 
-
-# model -------------------------------------------------------------------
-
-fxn.mod <- fxn.dt. %>% 
-
-  mutate(
-    # model = map(data, ~ lmer(aval ~ bl + value*time. + log.value*time. + (1 + time. | sjid), data = ., control = .lme4.ctrl))
-    # model = map(data, ~ lmer(aval ~ bl + value:time. + log.value:time. + (1 + time. | sjid), data = ., control = .lme4.ctrl))
-    # model = map(data, ~ lmer(aval ~ bl:time. + time. + log.value:time. + (1 + time. | sjid), data = ., control = .lme4.ctrl))
-    model = map(data, ~ lmer(aval ~ bl +  time.          + log.value:time. + (1 + time. | sjid), data = ., control = .lme4.ctrl))
-    # model = map(data, ~ lmer(aval ~ bl +  time. + sev.o + log.value:time. + (1 + time. | sjid), data = ., control = .lme4.ctrl))
-  )
-
-fxn.mod %>% 
-  # only best model 
-  mutate(
-    tidied  = map(model, ~ tidy(.x, conf.int = TRUE))) %>% 
-  unnest(tidied) %>%
-  filter(effect == 'fixed' & !term %in% c('(Intercept)')) %>% 
-  select(analysis.group, paramcd, phase, effect, term, estimate, p.value) %>% 
-  .fixmod(d=4) %>% 
-  .ct
-
-# comparison with GAA/AOO -------------------------------------------------
+# overall and by sev.o models ---------------------------------------------
 
 fxn.mod <- fxn.dt. %>%
-  unnest( data ) 
   
   mutate(
-    model.fxn = map(data, ~ lmer(aval ~ bl +  time. + log.value:time. + (1 + time. | sjid), data = ., control = .lme4.ctrl)),
-    model.gaa = map(data, ~ lmer(aval ~ bl +  time. + log.value:time. + (1 + time. | sjid), data = ., control = .lme4.ctrl)),
-    model.aoo = map(data, ~ lmer(aval ~ bl +  time. + log.value:time. + (1 + time. | sjid), data = ., control = .lme4.ctrl)),
+    model       = map(data, ~ lmer(aval ~ bl +        time.                 + (1 + time. | sjid), data = ., control = .lme4.ctrl)),
+    model.sev.o = map(data, ~ lmer(aval ~ bl +  sev.o:time.                 + (1 + time. | sjid), data = ., control = .lme4.ctrl))
   )
 
+ft. <- fxn.mod %>%
+  select(-data) %>% 
+  gather( type, model, model, model.sev.o) %>% 
+  mutate(
+    tidied  = map( model, ~ tidy(.x, conf.int = TRUE))) %>%
+  unnest(tidied) %>%
+  filter(effect == 'fixed' & !term %in% c('(Intercept)')) %>%
+  # filter(term   == 'time.') %>%
+  filter( grepl('time.', term ) ) %>%
+  select( analysis.group, phase, paramcd, term, estimate, p.value)
+
+ft. %>% 
+  
+  arrange( analysis.group, paramcd, phase ) %>% 
+  
+  mutate(phase = factor(phase, c(1,2), labels = c('amb.','non-amb.'))) %>% 
+  mutate(
+    p.value = formatC(p.value, format = "e", digits = 1)
+  ) %>% 
+  fashion %>% 
+  flextable %>% 
+  autofit %>% 
+  hline(i = seq(5,40,5), part = 'body')
 
 
 
-# sev.o -------------------------------------------------------------------
+# model modifiers ------------------------------------------------------------
 
 fxn.mod <- fxn.dt. %>% 
-  
+
   mutate(
-    # model = map(data, ~ lmer(aval ~ bl + value*time. + log.value*time. + (1 + time. | sjid), data = ., control = .lme4.ctrl))
-    # model = map(data, ~ lmer(aval ~ bl + value:time. + log.value:time. + (1 + time. | sjid), data = ., control = .lme4.ctrl))
-    # model = map(data, ~ lmer(aval ~ bl + time. + log.value:time. + (1 + time. | sjid), data = ., control = .lme4.ctrl))
-    model = map(data, ~ lmer(aval ~ bl + sev.o + time. + log.value:time. + (1 + time. | sjid), data = ., control = .lme4.ctrl))
+    model.s.fxn = map(data, ~ lmer(aval ~ bl +  time.        +  fxn.s:time. + (1 + time. | sjid), data = ., control = .lme4.ctrl)),
+    model.s.aoo = map(data, ~ lmer(aval ~ bl +  time.        +  aoo.s:time. + (1 + time. | sjid), data = ., control = .lme4.ctrl)),
+    model.s.gaa = map(data, ~ lmer(aval ~ bl +  time.        + gaa1.s:time. + (1 + time. | sjid), data = ., control = .lme4.ctrl)),
+    model.fxn   = map(data, ~ lmer(aval ~ bl +  time.        +  fxn.:time.  + (1 + time. | sjid), data = ., control = .lme4.ctrl)),
+    model.aoo   = map(data, ~ lmer(aval ~ bl +  time.        +  aoo.:time.  + (1 + time. | sjid), data = ., control = .lme4.ctrl)),
+    model.gaa   = map(data, ~ lmer(aval ~ bl +  time.        + gaa1.:time.  + (1 + time. | sjid), data = ., control = .lme4.ctrl))
   )
 
-fxn.mod %>% 
-  # only best model 
+ft. <- fxn.mod %>%
+  select(-data) %>% 
+  gather( type, model, starts_with('model') ) %>% 
   mutate(
-    tidied  = map(model, ~ tidy(.x, conf.int = TRUE))) %>% 
+    tidied  = map( model, ~ tidy(.x, conf.int = TRUE))) %>%
   unnest(tidied) %>%
-  filter(effect == 'fixed' & !term %in% c('(Intercept)','bl')) %>% 
-  select(analysis.group, paramcd, phase, effect, term, estimate, p.value) %>% 
-  .fixmod(d=4) %>% 
-  .ct
+  filter(effect == 'fixed' & !term %in% c('(Intercept)')) %>%
+  # filter(term   == 'time.') %>%
+  filter( grepl('time.', term ) ) %>%
+  select( analysis.group, phase, paramcd, term, estimate, p.value)
+
+ft. %>% 
+  
+  filter(paramcd =='FARS.E') %>% 
+  filter(analysis.group == 'TQ Cohort [ng/ml] FXN-M') %>% 
+  
+  arrange( analysis.group, paramcd, phase ) %>% 
+  
+  mutate(phase = factor(phase, c(1,2), labels = c('amb.','non-amb.'))) %>% 
+  mutate(
+    p.value = formatC(p.value, format = "e", digits = 1)
+  ) %>% 
+  fashion %>% 
+  flextable %>% 
+  autofit %>% 
+  hline(i = seq(2,10,2), part = 'body')
 
 
+
+bind_rows(
+  fxn.mod %>%
+    mutate(
+      tidied  = map( model, ~ tidy(.x, conf.int = TRUE))) %>%
+    unnest(tidied) %>%
+    filter(effect == 'fixed' & !term %in% c('(Intercept)')) %>%
+    select(analysis.group, paramcd, phase, effect, term, estimate, p.value),
+  
+  fxn.mod %>% 
+    mutate(
+      tidied  = map( model.fxn, ~ tidy(.x, conf.int = TRUE))) %>% 
+    unnest(tidied) %>%
+    filter(effect == 'fixed' & !term %in% c('(Intercept)')) %>% 
+    select(analysis.group, paramcd, phase, effect, term, estimate, p.value),
+
+  fxn.mod %>% 
+    mutate(
+      tidied  = map( model.gaa, ~ tidy(.x, conf.int = TRUE))) %>% 
+    unnest(tidied) %>%
+    filter(effect == 'fixed' & !term %in% c('(Intercept)')) %>% 
+    select(analysis.group, paramcd, phase, effect, term, estimate, p.value),
+
+  fxn.mod %>% 
+    mutate(
+      tidied  = map( model.aoo, ~ tidy(.x, conf.int = TRUE))) %>% 
+    unnest(tidied) %>%
+    filter(effect == 'fixed' & !term %in% c('(Intercept)')) %>% 
+    select(analysis.group, paramcd, phase, effect, term, estimate, p.value)
+) %>% 
+  filter(term != 'bl') %>% 
+  # filter(term == 'time.') %>% 
+  filter( analysis.group %in% 
+            c("TQ Cohort [ng/ml] FXN-M", 'LF Cohort [%] FXN-M')
+          ) %>% 
+  arrange( analysis.group ) %>% 
+  # fashion %>% 
+  mutate(
+    p.value = formatC(p.value, format = "e", digits = 1)
+  ) %>% 
+  flextable %>% 
+  autofit %>% 
+  hline(i = c(4,6,8,10,14,16,18), part = 'body')
+
+# within sev.o -------------------------------------------------------------------
+
+# fxn.mod <- fxn.dt. %>% 
+#   
+#   mutate(
+#     # model = map(data, ~ lmer(aval ~ bl + value*time. + log.value*time. + (1 + time. | sjid), data = ., control = .lme4.ctrl))
+#     # model = map(data, ~ lmer(aval ~ bl + value:time. + log.value:time. + (1 + time. | sjid), data = ., control = .lme4.ctrl))
+#     # model = map(data, ~ lmer(aval ~ bl + time. + log.value:time. + (1 + time. | sjid), data = ., control = .lme4.ctrl))
+#     model = map(data, ~ lmer(aval ~ bl + sev.o + time. + log.value:time. + (1 + time. | sjid), data = ., control = .lme4.ctrl))
+#   )
+# 
+# fxn.mod %>% 
+#   # only best model 
+#   mutate(
+#     tidied  = map(model, ~ tidy(.x, conf.int = TRUE))) %>% 
+#   unnest(tidied) %>%
+#   filter(effect == 'fixed' & !term %in% c('(Intercept)','bl')) %>% 
+#   select(analysis.group, paramcd, phase, effect, term, estimate, p.value) %>% 
+#   .fixmod(d=4) %>% 
+#   .ct
 
 # tidy, glance, performance -----------------------------------------------
 

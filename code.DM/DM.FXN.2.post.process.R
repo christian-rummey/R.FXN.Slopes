@@ -48,5 +48,8 @@ fxn. %<>%
   )) %>%
   mutate( sev.o = factor( sev.o, c(levels(fxn.$sev.o), 'carrier','control')))
 
+fxn. %>% 
+  write_rds('DATA derived/fxn.2.rds')
+
 fxn. %>%
   select( assay, sev.o ) %>% .tab

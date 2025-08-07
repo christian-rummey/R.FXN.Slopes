@@ -1,7 +1,9 @@
 
 # intro -------------------------------------------------------------------
 
-source('DM.FXN.combine.post.process.R')
+# source('DM.FXN.combine.post.process.R')
+fxn. <- read_rds('DATA derived/fxn.2.rds')
+
 
 # density -----------------------------------------------------------------
 
@@ -66,20 +68,20 @@ fxn.tmp %>%
 
 # gaa vs fxn --------------------------------------------------------------
 
-fxn.tmp %>% 
-  # filter( !(status == 'patient' & pm!=0) ) %>% 
-  ggplot()+geom_point(alpha = 1)+
-  aes( y = fxn )+
-  aes( x = gaa1 )+
-  aes(size = pm)+
-  aes(color = pm)+scale_fill_brewer(palette = 'Set1')+
-  # aes(fill = sev.o)+ggsci::scale_fill_nejm()+
-  facet_wrap( ~assay+type, ncol = 3, scales = 'free' )+
-  scale_y_log10()+
-  # geom_vline( aes(xintercept = fxn, color = sev.o), data = fxn.sum ) + ggsci::scale_color_nejm()+
-  .theme(base_size = 14)+
-  guides(color = guide_legend(nrow = 1, title = NULL))+
-  guides(fill  = guide_legend(nrow = 1, title = NULL))
+# fxn.tmp %>% 
+#   # filter( !(status == 'patient' & pm!=0) ) %>% 
+#   ggplot()+geom_point(alpha = 1)+
+#   aes( y = fxn )+
+#   aes( x = gaa1 )+
+#   # aes(size = pm)+
+#   aes(color = pm)+scale_fill_brewer(palette = 'Set1')+
+#   # aes(fill = sev.o)+ggsci::scale_fill_nejm()+
+#   facet_wrap( ~assay+type, ncol = 3, scales = 'free' )+
+#   scale_y_log10()+
+#   # geom_vline( aes(xintercept = fxn, color = sev.o), data = fxn.sum ) + ggsci::scale_color_nejm()+
+#   .theme(base_size = 14)+
+#   guides(color = guide_legend(nrow = 1, title = NULL))+
+#   guides(fill  = guide_legend(nrow = 1, title = NULL))
 
 
 

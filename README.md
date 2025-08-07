@@ -37,7 +37,7 @@ Modelling the impact of Frataxin Levels on Disease Progression in FA
 
     -   Density plots clarify need to use log scales
 
-# code.Tables
+# code.Results
 
 -   FXN.TableOne.Cohorts.R
 

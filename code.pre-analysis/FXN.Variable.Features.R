@@ -11,7 +11,6 @@ rm(list=ls())
 
 require(skimr)
 require(moments)
-require(here)
 library(corrr)
 options(digits = 5)
 
