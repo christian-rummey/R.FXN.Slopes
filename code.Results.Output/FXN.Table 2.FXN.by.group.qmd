@@ -1,0 +1,92 @@
+---
+title: "FXN Assay Summary Table"
+format:
+  html:
+    toc: true
+    code-fold: true
+    code-summary: "Show Code"
+    self-contained: true
+execute:
+  echo: true
+  warning: false
+  message: false
+editor: visual
+---
+
+```{r setup}
+library(tidyverse)
+library(here)
+library(flextable)
+library(officer)
+options(digits = 5)
+```
+
+## Load and Prepare Data
+
+```{r}
+# Load and filter
+fxn <- read_rds(here("DATA derived/fxn.2.rds"))
+
+fxn <- fxn %>%
+  filter(type != "FXN-T") %>%
+  droplevels()
+
+# Clean data for plotting/summarizing
+fxn_tmp <- fxn %>%
+  filter(type != "FXN-T") %>%
+  filter(!is.na(sev.o)) %>%
+  filter(pm == 0 | is.na(pm)) %>%
+  mutate(fxn = value) %>%
+  droplevels()
+```
+
+## Summary Table
+
+```{r}
+# Generate result table
+result_table <- fxn_tmp %>%
+  group_by(analysis.group, sev.o, status, type, unit) %>%
+  summarise(
+    n = n(),
+    mean_fxn = mean(value, na.rm = TRUE),
+    .groups = "drop_last"
+  ) %>%
+  arrange(analysis.group, type, sev.o) %>%
+  group_by(analysis.group, type, unit) %>%
+  mutate(
+    group_pct_contr = 100 * mean_fxn / max(mean_fxn),
+    group_mult_contr = mean_fxn / min(mean_fxn)
+  ) %>%
+  ungroup() %>%
+  select(analysis.group, status, sev.o, n, starts_with("mean"), starts_with("group"))
+```
+
+## Table Output (HTML and Word)
+
+```{r}
+# Format and display with flextable
+ft <- result_table %>%
+  flextable() %>%
+  colformat_double(digits = 1) %>%
+  merge_v(j = c("analysis.group", "status")) %>%
+  align(j = c("analysis.group", "status"), align = "center", part = "all") %>%
+  theme_booktabs() %>%
+  hline(i = c(6, 12), border = fp_border(width = 2)) %>%
+  vline(j = c("status", "sev.o", "n"), border = fp_border(color = "grey", width = 1)) %>%
+  border_outer(border = fp_border(color = "black", width = 1)) %>%
+  autofit() %>%
+  set_table_properties(layout = "autofit") %>%
+  fontsize(size = 10, part = "all") %>%
+  font(fontname = "Times", part = "all") %>%
+  padding(padding = 4, part = "all")
+
+ft
+```
+
+```{r}
+# Save to Word
+doc <- read_docx() %>%
+  body_add_flextable(ft)
+
+print(doc, target = here("code.Results/FXN.Table 2.FXN.by.group.docx"))
+```

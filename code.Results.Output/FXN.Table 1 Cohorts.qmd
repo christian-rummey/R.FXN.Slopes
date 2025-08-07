@@ -1,0 +1,155 @@
+---
+title: "FXN.Table 1 Cohorts"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    code-fold: true
+    code-summary: "Show Code"
+    self-contained: true
+execute:
+  echo: true
+  warning: false
+  message: false
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup}
+rm(list=ls())
+library(tidyverse)
+library(here)
+library(flextable)
+library(officer)
+library(labelled)
+library(tableone)
+options(digits = 5)
+```
+
+## Load and Preprocess Data
+
+```{r}
+fxn.dt <- read_rds(here('DATA derived/fxn.dt.rds'))
+
+# Filter to baseline data
+bl.tmp <- fxn.dt %>%
+  filter(pm == 0, paramcd == "mFARS", type == "FXN-M") %>%
+  unnest(data) %>%
+  filter(!dupline, !is.na(bl.age)) %>%
+  group_by(sjid, analysis.group) %>%
+  mutate(follow.up = ifelse(n() > 1, "FU", "No-FU")) %>%
+  filter(avisitn == min(avisitn)) %>%
+  ungroup()
+
+# Step summary
+step_summary <- list(
+  step0 = bl.tmp %>% count(analysis.group, name = "n_total"),
+  step1 = bl.tmp %>% filter(follow.up != "No-FU") %>% count(analysis.group, name = "n_after_fu"),
+  step2 = bl.tmp %>% filter(follow.up != "No-FU", phase == 1) %>% count(analysis.group, name = "n_after_phase1")
+) %>%
+  reduce(left_join, by = "analysis.group") %>%
+  mutate(
+    dropped_no_fu  = n_total - n_after_fu,
+    dropped_phase2 = n_after_fu - n_after_phase1,
+    final_n        = n_after_phase1
+  )
+```
+
+## Construct Demo Table Data
+
+```{r}
+# Functional group linkage
+fxn.group.sjid <- fxn.dt %>%
+  filter(pm == 0, type == "FXN-M") %>%
+  distinct(study, sjid, analysis.group)
+
+dt.bl <- fxn.dt %>%
+  filter(pm == 0, paramcd == "mFARS", type == "FXN-M") %>%
+  unnest(data) %>%
+  filter(!dupline, !is.na(bl.age)) %>%
+  group_by(sjid) %>%
+  mutate(age = bl.age + time.) %>%
+  distinct(study, sjid, age, time., phase, status, sev.o, sex, aoo, gaa1, gaa2, pm) %>%
+  mutate(
+    fu_t = max(age) - min(age),
+    fu_v = n(),
+    NoFU = ifelse(fu_v == 1, TRUE, FALSE),
+    fu_t = ifelse(NoFU, NA, fu_t),
+    fu_v = ifelse(NoFU, NA, fu_v)
+  ) %>%
+  filter(age == min(age)) %>%
+  distinct()
+
+# Merge in analysis group
+dt.bl <- left_join(fxn.group.sjid, dt.bl, by = c("study", "sjid", 'phase'))
+
+# Recode and organize
+dt.bl <- dt.bl %>%
+  rename(bl_age = age) %>%
+  select(study, analysis.group, phase, sjid, NoFU, fu_v, fu_t, bl_age, sex, sev.o, aoo, gaa1, gaa2) %>%
+  mutate(analysis.group = factor(analysis.group, c("LF Cohort [%] FXN-M", "TQ Cohort [ng/ml] FXN-M")))
+
+# Add FARS baseline scores
+dt.bl.fars <- fxn.dt %>%
+  filter(pm == 0, type == "FXN-M") %>%
+  group_by(analysis.group, paramcd, sjid) %>%
+  unnest(data) %>%
+  filter(!is.na(bl.age), avisitn == min(avisitn)) %>%
+  select(analysis.group, study, sjid, paramcd, aval) %>%
+  pivot_wider(names_from = paramcd, values_from = aval)
+
+dt.bl <- left_join(dt.bl, dt.bl.fars, by = c("analysis.group", "study", "sjid"))
+```
+
+## Create Table 1 (HTML and Word Output)
+
+```{r}
+.tab1.sub <- function(df, strata = NA) {
+  tableone::CreateTableOne(
+    vars = c("sev.o", "bl_age", "sex",  "aoo", "gaa1", "gaa2", "phase", "fu_v", "fu_t", "NoFU", "mFARS", "FARS.E", "FARS.B"),
+    factorVars = c("sev.o", "sex", "phase", "NoFU", "analysis.group"),
+    strata = strata,
+    data = df,
+    test = TRUE
+  ) %>%
+    print(
+      varLabels = TRUE,
+      nonnormal = c("bl_age", "aoo", "gaa1", "gaa2", "fu_v", "fu_t"),
+      contDigits = 1, catDigits = 1,
+      missing = TRUE,
+      explain = FALSE,
+      dropEqual = FALSE,
+      add.rownames = TRUE
+    ) %>%
+    data.frame() %>%
+    rownames_to_column() %>%
+    flextable() %>%
+    theme_booktabs() %>%
+    autofit() %>%
+    align(align = "left", part = "all") %>%
+    valign(valign = "top", part = "all") %>%
+    set_table_properties(layout = "autofit") %>%
+    fontsize(size = 10, part = "all") %>%
+    padding(padding = 4, part = "all") %>%
+    border_remove() %>%
+    border_outer() %>%
+    border_inner()
+}
+
+# Apply function
+my.ft <- .tab1.sub(
+  dt.bl %>%
+    ungroup %>% select(-paramcd) %>% 
+    unique %>% 
+    mutate(phase = factor(phase, c("2", "1"), labels = c("non-amb.", "ambulatory"))) %>%
+    filter(!NoFU),
+  strata = "analysis.group"
+)
+
+# Export to Word
+doc <- read_docx() %>%
+  body_add_flextable(my.ft)
+
+print(doc, target = here("code.Results/FXN.Table 1 Cohorts.docx"))
+```
